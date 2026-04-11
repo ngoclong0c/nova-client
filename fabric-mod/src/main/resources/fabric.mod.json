@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "nova-client",
+  "version": "${version}",
+  "name": "Nova Client",
+  "description": "Mod PvP & Sinh tồn - HUD, FullBright, Zoom, Sprint Toggle",
+  "authors": ["NovaClient"],
+  "contact": {},
+  "license": "MIT",
+  "icon": "assets/nova-client/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "client": ["com.novaclient.mod.NovaClientMod"]
+  },
+  "mixins": [],
+  "depends": {
+    "fabricloader": ">=0.16.0",
+    "fabric-api": "*",
+    "minecraft": "~1.21",
+    "java": ">=21"
+  }
+}

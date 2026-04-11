@@ -1,0 +1,1064 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Nova Client</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@300;400;500;600&display=swap');
+
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg: #0d1117;
+  --bg2: #0a0f1a;
+  --surface: rgba(255,255,255,0.04);
+  --border: rgba(255,255,255,0.07);
+  --text: #e6edf3;
+  --muted: rgba(255,255,255,0.35);
+  --accent: #4fc3f7;
+  --purple: #7c4dff;
+  --green: #28c840;
+  --gold: #f59e0b;
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;user-select:none;}
+
+/* --- Titlebar --- */
+#titlebar{
+  height:40px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 14px;background:rgba(10,14,20,0.95);border-bottom:1px solid var(--border);
+  -webkit-app-region:drag;flex-shrink:0;
+}
+.title-logo{display:flex;align-items:center;gap:8px;font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;letter-spacing:1.5px;background:linear-gradient(135deg,var(--accent),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.win-btns{display:flex;gap:6px;-webkit-app-region:no-drag;}
+.win-btn{width:12px;height:12px;border-radius:50%;border:none;cursor:pointer;transition:filter .2s;}
+.win-btn:hover{filter:brightness(1.3);}
+#btn-min{background:#ffbd2e;}
+#btn-max{background:#28c840;}
+#btn-close{background:#ff5f57;}
+
+/* --- Layout --- */
+#app{display:flex;height:calc(100vh - 40px);}
+
+/* --- Sidebar --- */
+#sidebar{
+  width:190px;flex-shrink:0;background:rgba(10,14,20,0.7);
+  border-right:1px solid var(--border);display:flex;flex-direction:column;padding:12px 8px;
+}
+.nav-lbl{font-size:9px;font-weight:600;letter-spacing:1.5px;color:rgba(255,255,255,0.2);padding:8px 8px 4px;text-transform:uppercase;}
+.nav-item{
+  display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:7px;
+  cursor:pointer;font-size:12.5px;font-weight:500;color:var(--muted);margin-bottom:2px;transition:all .15s;
+}
+.nav-item:hover{background:var(--surface);color:rgba(255,255,255,0.75);}
+.nav-item.active{background:rgba(79,195,247,0.12);color:var(--accent);}
+.nav-item svg{flex-shrink:0;opacity:.7;}
+.nav-item.active svg{opacity:1;}
+.nav-divider{height:1px;background:var(--border);margin:8px 0;}
+.sidebar-footer{margin-top:auto;}
+.user-box{
+  display:flex;align-items:center;gap:9px;padding:10px;border-radius:8px;
+  background:var(--surface);cursor:pointer;transition:background .15s;
+}
+.user-box:hover{background:rgba(255,255,255,0.07);}
+.user-box.logged-in .avatar-ring{border-color:var(--green);}
+.avatar{
+  width:32px;height:32px;border-radius:6px;display:flex;align-items:center;
+  justify-content:center;font-size:14px;font-weight:700;color:white;flex-shrink:0;
+  background:linear-gradient(135deg,#1a237e,var(--accent));
+}
+.u-name{font-size:12.5px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.u-status{font-size:10px;color:var(--gold);font-weight:500;}
+.u-status.online{color:var(--green);}
+.login-hint{font-size:10.5px;color:var(--muted);}
+
+/* --- Main content --- */
+#content{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+
+/* Hero */
+#hero{
+  height:180px;flex-shrink:0;position:relative;overflow:hidden;
+  background:linear-gradient(135deg,#0d1b2a 0%,#1a1a2e 50%,#0d1117 100%);
+}
+#hero-grid{position:absolute;inset:0;opacity:.05;}
+.hero-text{position:absolute;left:28px;bottom:24px;}
+.hero-title{
+  font-family:'Rajdhani',sans-serif;font-size:26px;font-weight:700;
+  background:linear-gradient(135deg,#fff,var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.hero-sub{font-size:12px;color:var(--muted);margin-top:4px;}
+.status-pill{
+  display:inline-flex;align-items:center;gap:5px;margin-top:8px;
+  background:rgba(79,195,247,.12);border:1px solid rgba(79,195,247,.3);
+  border-radius:20px;padding:3px 10px;font-size:10.5px;font-weight:600;color:var(--accent);
+}
+.pulse{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+
+/* Right panels */
+#panels{flex:1;display:grid;grid-template-columns:1fr 240px;overflow:hidden;}
+#left{padding:18px;overflow-y:auto;display:flex;flex-direction:column;gap:16px;}
+#right{border-left:1px solid var(--border);padding:16px;overflow-y:auto;display:flex;flex-direction:column;gap:14px;background:rgba(10,14,20,.35);}
+
+.section-lbl{font-size:10px;font-weight:600;letter-spacing:1.5px;color:rgba(255,255,255,.25);text-transform:uppercase;margin-bottom:10px;}
+
+/* Version grid */
+#version-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;max-height:220px;overflow-y:auto;padding-right:4px;}
+.ver-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:8px;
+  padding:9px 11px;cursor:pointer;transition:all .15s;position:relative;overflow:hidden;
+}
+.ver-card:hover{border-color:rgba(255,255,255,.15);transform:translateY(-1px);}
+.ver-card.sel{background:rgba(79,195,247,.1);border-color:rgba(79,195,247,.4);}
+.ver-card.sel::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent),var(--purple));}
+.ver-num{font-family:'Rajdhani',sans-serif;font-size:14.5px;font-weight:700;color:var(--text);}
+.ver-type{font-size:9.5px;color:var(--muted);margin-top:1px;}
+.badge{display:inline-block;margin-top:5px;font-size:9px;font-weight:600;padding:2px 6px;border-radius:3px;background:rgba(40,200,64,.15);color:var(--green);}
+.badge.beta{background:rgba(245,158,11,.15);color:var(--gold);}
+
+/* Mods */
+.mod-row{
+  display:flex;align-items:center;gap:10px;padding:8px 10px;
+  background:var(--surface);border:1px solid var(--border);border-radius:8px;margin-bottom:5px;cursor:pointer;transition:background .15s;
+}
+.mod-row:hover{background:rgba(255,255,255,.06);}
+.mod-row.installed{border-color:rgba(40,200,64,.3);}
+.mod-ico{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.mod-info{flex:1;min-width:0;}
+.mod-name{font-size:12px;font-weight:500;display:flex;align-items:center;gap:6px;}
+.mod-name .mod-badge{font-size:8px;padding:1px 5px;border-radius:3px;background:rgba(40,200,64,.15);color:var(--green);font-weight:600;}
+.mod-desc{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.toggle{width:34px;height:18px;border-radius:9px;background:rgba(255,255,255,.1);position:relative;cursor:pointer;transition:background .2s;flex-shrink:0;}
+.toggle.on{background:var(--accent);}
+.toggle::after{content:'';position:absolute;width:12px;height:12px;border-radius:50%;background:#fff;top:3px;left:3px;transition:transform .2s;}
+.toggle.on::after{transform:translateX(16px);}
+
+/* Mod Manager */
+.mod-header{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;}
+.mod-select{
+  background:var(--surface);border:1px solid var(--border);border-radius:6px;
+  padding:5px 8px;font-size:11px;color:var(--text);font-family:'Inter',sans-serif;outline:none;
+}
+.mod-select option{background:#1a1a2e;}
+.mod-select-label{font-size:10px;color:var(--muted);font-weight:600;}
+.mod-checkbox{display:flex;align-items:center;gap:5px;font-size:10.5px;color:var(--muted);cursor:pointer;margin-left:auto;}
+.mod-checkbox input{accent-color:var(--accent);}
+.mod-section-title{font-size:9.5px;font-weight:600;letter-spacing:1px;color:rgba(255,255,255,.2);text-transform:uppercase;margin:10px 0 6px;padding-left:2px;}
+.mod-list{max-height:160px;overflow-y:auto;padding-right:3px;}
+.install-bar{display:flex;align-items:center;gap:8px;margin-top:10px;}
+.install-btn{
+  flex:1;padding:9px;border:none;border-radius:7px;
+  background:linear-gradient(135deg,#0078ff,var(--accent));
+  font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:700;
+  color:#fff;cursor:pointer;letter-spacing:.5px;transition:all .2s;
+}
+.install-btn:hover{filter:brightness(1.1);}
+.install-btn:disabled{opacity:.5;cursor:not-allowed;filter:none;}
+.install-btn.success{background:linear-gradient(135deg,#28c840,#20a838);}
+#mod-progress{display:none;margin-top:6px;}
+#mod-progress.show{display:block;}
+#mod-progress-text{font-size:10px;color:var(--muted);margin-bottom:3px;}
+#mod-progress-track{height:3px;background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden;}
+#mod-progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--purple));width:0%;transition:width .3s;}
+
+/* Stats */
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:4px;}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:9px;text-align:center;}
+.stat-v{font-family:'Rajdhani',sans-serif;font-size:19px;font-weight:700;color:var(--accent);}
+.stat-l{font-size:9.5px;color:var(--muted);margin-top:1px;}
+
+/* News */
+.news-card{
+  padding:10px;background:var(--surface);border:1px solid var(--border);
+  border-radius:8px;margin-bottom:6px;cursor:pointer;transition:background .15s;
+}
+.news-card:hover{background:rgba(255,255,255,.06);}
+.news-tag{font-size:9px;font-weight:700;letter-spacing:1px;color:var(--gold);text-transform:uppercase;}
+.news-ttl{font-size:11.5px;font-weight:500;margin-top:3px;line-height:1.4;}
+.news-date{font-size:10px;color:var(--muted);margin-top:4px;}
+
+/* Launch bar */
+#launch-bar{
+  height:56px;flex-shrink:0;padding:0 18px;
+  background:rgba(10,14,20,.97);border-top:1px solid var(--border);
+  display:flex;align-items:center;gap:10px;
+}
+#server-input{
+  flex:1;background:var(--surface);border:1px solid var(--border);border-radius:7px;
+  padding:8px 13px;font-size:12.5px;color:var(--text);font-family:'Inter',sans-serif;outline:none;transition:border-color .2s;
+}
+#server-input::placeholder{color:var(--muted);}
+#server-input:focus{border-color:rgba(79,195,247,.4);}
+#ram-select{
+  background:var(--surface);border:1px solid var(--border);border-radius:7px;
+  padding:8px 10px;font-size:12.5px;color:var(--text);font-family:'Inter',sans-serif;outline:none;width:74px;
+}
+#ram-select option{background:#1a1a2e;}
+#launch-btn{
+  display:flex;align-items:center;gap:7px;padding:9px 22px;
+  background:linear-gradient(135deg,#0078ff,var(--accent));
+  border:none;border-radius:7px;font-family:'Rajdhani',sans-serif;
+  font-size:14px;font-weight:700;letter-spacing:1px;color:#fff;cursor:pointer;
+  transition:all .2s;white-space:nowrap;
+}
+#launch-btn:hover{filter:brightness(1.1);}
+#launch-btn:active{transform:scale(.98);}
+#launch-btn:disabled{opacity:.5;cursor:not-allowed;filter:none;}
+#launch-btn.running{background:linear-gradient(135deg,#e53935,#ff5252);}
+
+/* Progress */
+#progress-area{display:none;flex:1;flex-direction:column;gap:4px;}
+#progress-area.show{display:flex;}
+#progress-text{font-size:11px;color:var(--muted);}
+#progress-track{height:4px;background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden;}
+#progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--purple));width:0%;transition:width .3s;}
+
+/* Login overlay */
+#login-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:100;
+  display:none;align-items:center;justify-content:center;backdrop-filter:blur(6px);
+}
+#login-overlay.show{display:flex;}
+.login-card{
+  background:#0f1724;border:1px solid rgba(79,195,247,.2);border-radius:14px;
+  padding:36px;text-align:center;width:340px;
+}
+.login-logo{font-family:'Rajdhani',sans-serif;font-size:24px;font-weight:700;
+  background:linear-gradient(135deg,var(--accent),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px;}
+.login-sub{font-size:13px;color:var(--muted);margin-bottom:28px;line-height:1.5;}
+.ms-btn{
+  width:100%;padding:13px;background:linear-gradient(135deg,#0078ff,var(--accent));
+  border:none;border-radius:9px;font-family:'Rajdhani',sans-serif;font-size:15px;
+  font-weight:700;color:#fff;cursor:pointer;letter-spacing:.5px;transition:filter .2s;
+}
+.ms-btn:hover{filter:brightness(1.1);}
+.login-note{font-size:10.5px;color:rgba(255,255,255,.2);margin-top:16px;}
+
+/* Logs */
+#log-area{
+  display:none;position:absolute;bottom:70px;right:10px;width:340px;height:180px;
+  background:#0a0f1a;border:1px solid var(--border);border-radius:8px;overflow-y:auto;
+  padding:8px;font-family:monospace;font-size:10px;color:rgba(255,255,255,.4);z-index:50;
+}
+#log-area.show{display:block;}
+
+/* Update banner */
+#update-banner{
+  display:none;position:fixed;top:44px;left:50%;transform:translateX(-50%);z-index:90;
+  background:linear-gradient(135deg,rgba(13,17,23,.97),rgba(15,23,36,.97));
+  border:1px solid rgba(79,195,247,.4);border-radius:12px;padding:14px 20px;
+  min-width:360px;max-width:500px;backdrop-filter:blur(12px);
+  box-shadow:0 8px 32px rgba(0,0,0,.5);animation:slideDown .3s ease;
+}
+#update-banner.show{display:block;}
+@keyframes slideDown{from{opacity:0;transform:translateX(-50%) translateY(-10px);}to{opacity:1;transform:translateX(-50%) translateY(0);}}
+.update-header{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.update-icon{font-size:20px;flex-shrink:0;}
+.update-title{font-size:13px;font-weight:600;color:var(--accent);flex:1;}
+.update-close{background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:2px 6px;border-radius:4px;}
+.update-close:hover{background:rgba(255,255,255,.1);color:var(--text);}
+.update-desc{font-size:11px;color:var(--muted);margin-bottom:8px;line-height:1.5;}
+.update-versions{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:11px;}
+.update-ver-old{color:var(--muted);background:rgba(255,255,255,.06);padding:3px 8px;border-radius:4px;}
+.update-ver-arrow{color:var(--muted);}
+.update-ver-new{color:var(--green);background:rgba(40,200,64,.12);padding:3px 8px;border-radius:4px;font-weight:600;}
+.update-progress{margin-bottom:8px;}
+.update-progress-text{font-size:10px;color:var(--muted);margin-bottom:4px;}
+.update-progress-track{height:4px;background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden;}
+.update-progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--purple));width:0%;transition:width .3s;}
+.update-actions{display:flex;gap:8px;}
+.update-btn{
+  flex:1;padding:8px 14px;border:none;border-radius:7px;font-size:11.5px;font-weight:600;
+  cursor:pointer;font-family:'Rajdhani',sans-serif;letter-spacing:.5px;transition:all .2s;
+}
+.update-btn.primary{background:linear-gradient(135deg,#0078ff,var(--accent));color:#fff;}
+.update-btn.secondary{background:rgba(255,255,255,.06);color:var(--muted);border:1px solid var(--border);}
+.update-btn:hover{filter:brightness(1.15);}
+.update-btn:disabled{opacity:.5;cursor:not-allowed;filter:none;}
+.update-notes{font-size:10px;color:rgba(255,255,255,.2);margin-top:8px;max-height:60px;overflow-y:auto;line-height:1.4;border-top:1px solid var(--border);padding-top:6px;}
+</style>
+</head>
+<body>
+
+<!-- Login overlay -->
+<div id="login-overlay" class="show">
+  <div class="login-card">
+    <div class="login-logo">NOVA CLIENT</div>
+    <div class="login-sub">Nhập tên để chơi Crack hoặc đăng nhập Microsoft</div>
+    <input id="offlineUsername" type="text" placeholder="Nhập tên người chơi..." style="
+      width:100%;padding:12px;background:rgba(255,255,255,0.06);border:1px solid rgba(79,195,247,0.3);
+      border-radius:9px;font-size:14px;color:#e6edf3;font-family:'Inter',sans-serif;
+      outline:none;margin-bottom:12px;text-align:center;
+    "/>
+    <button class="ms-btn" id="offlineBtn" onclick="doOfflineLogin()" style="margin-bottom:10px;background:linear-gradient(135deg,#28c840,#20a838);">
+      ⚡ Chơi Crack / Offline
+    </button>
+    <div style="font-size:11px;color:rgba(255,255,255,0.2);margin-bottom:12px;">— hoặc —</div>
+    <button class="ms-btn" id="loginBtn" onclick="doLogin()" style="background:linear-gradient(135deg,#0078ff,#4fc3f7);font-size:13px;padding:10px;">
+      🪟 Đăng nhập Microsoft (Premium)
+    </button>
+    <div class="login-note">Crack: chỉ chơi được server crack | Microsoft: chơi mọi server</div>
+  </div>
+</div>
+
+<!-- Update banner -->
+<div id="update-banner">
+  <div class="update-header">
+    <div class="update-icon">🚀</div>
+    <div class="update-title" id="update-title">Có bản cập nhật mới!</div>
+    <button class="update-close" onclick="dismissUpdate()">&times;</button>
+  </div>
+  <div class="update-desc" id="update-desc"></div>
+  <div class="update-versions" id="update-versions" style="display:none;">
+    <span class="update-ver-old" id="update-ver-old">v0.1.0</span>
+    <span class="update-ver-arrow">→</span>
+    <span class="update-ver-new" id="update-ver-new">v0.1.1</span>
+  </div>
+  <div class="update-progress" id="update-progress" style="display:none;">
+    <div class="update-progress-text" id="update-progress-text">Đang tải...</div>
+    <div class="update-progress-track"><div class="update-progress-fill" id="update-progress-fill"></div></div>
+  </div>
+  <div class="update-actions" id="update-actions">
+    <button class="update-btn primary" id="update-install-btn" onclick="doAutoUpdate()">CẬP NHẬT NGAY</button>
+    <button class="update-btn secondary" onclick="dismissUpdate()">Bỏ qua</button>
+  </div>
+  <div class="update-notes" id="update-notes" style="display:none;"></div>
+</div>
+
+<!-- Log area -->
+<div id="log-area"></div>
+
+<!-- Titlebar -->
+<div id="titlebar">
+  <div class="title-logo">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+      <rect x="3" y="3" width="8" height="8" rx="1" fill="#4fc3f7" opacity=".9"/>
+      <rect x="13" y="3" width="8" height="8" rx="1" fill="#7c4dff" opacity=".9"/>
+      <rect x="3" y="13" width="8" height="8" rx="1" fill="#7c4dff" opacity=".9"/>
+      <rect x="13" y="13" width="8" height="8" rx="1" fill="#4fc3f7" opacity=".9"/>
+    </svg>
+    NOVA CLIENT
+  </div>
+  <div class="win-btns">
+    <button class="win-btn" id="btn-min" onclick="novaAPI.minimize()"></button>
+    <button class="win-btn" id="btn-max" onclick="novaAPI.maximize()"></button>
+    <button class="win-btn" id="btn-close" onclick="novaAPI.close()"></button>
+  </div>
+</div>
+
+<div id="app">
+  <!-- Sidebar -->
+  <div id="sidebar">
+    <div class="nav-lbl">Menu</div>
+    <div class="nav-item active">
+      <svg width="15" height="15" fill="currentColor" viewBox="0 0 20 20"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/></svg>
+      Trang chủ
+    </div>
+    <div class="nav-item" onclick="novaAPI.openFolder()">
+      <svg width="15" height="15" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>
+      Thư mục game
+    </div>
+    <div class="nav-item" onclick="toggleLogs()">
+      <svg width="15" height="15" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/></svg>
+      Console log
+    </div>
+    <div class="nav-item" onclick="checkForUpdates()">
+      <svg width="15" height="15" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/></svg>
+      Kiểm tra update
+    </div>
+
+    <div class="nav-divider"></div>
+
+    <div class="sidebar-footer">
+      <div class="user-box" id="userBox">
+        <div class="avatar" id="userAvatar">?</div>
+        <div>
+          <div class="u-name" id="userName">Chưa đăng nhập</div>
+          <div class="login-hint">Nhấn để đăng nhập</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div id="content">
+    <!-- Hero -->
+    <div id="hero">
+      <svg id="hero-grid" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+        <defs><pattern id="g" width="30" height="30" patternUnits="userSpaceOnUse"><path d="M 30 0 L 0 0 0 30" fill="none" stroke="#4fc3f7" stroke-width=".5"/></pattern></defs>
+        <rect width="100%" height="100%" fill="url(#g)"/>
+      </svg>
+      <div class="hero-text">
+        <div style="display:flex;align-items:center;gap:7px;margin-bottom:7px">
+          <div class="pulse"></div>
+          <span style="font-size:11px;color:rgba(255,255,255,.4);font-weight:500">Sẵn sàng chơi</span>
+        </div>
+        <div class="hero-title">NOVA CLIENT</div>
+        <div class="hero-sub">Minecraft Launcher — v<span id="app-version">0.1.0</span></div>
+        <div class="status-pill"><div class="pulse"></div><span id="selectedVerLabel">1.26.1</span></div>
+      </div>
+    </div>
+
+    <div id="panels">
+      <div id="left">
+        <!-- Versions -->
+        <div>
+          <div class="section-lbl">Chọn phiên bản</div>
+          <div id="version-grid">
+            <div style="color:var(--muted);font-size:12px;grid-column:1/-1;text-align:center;padding:20px;">Đang tải danh sách phiên bản...</div>
+          </div>
+        </div>
+
+        <!-- Mod Manager -->
+        <div>
+          <div class="section-lbl">Mod Manager</div>
+
+          <!-- Branch / Build selectors -->
+          <div class="mod-header">
+            <span class="mod-select-label">Branch:</span>
+            <select class="mod-select" id="mod-branch">
+              <option>Nextgen</option>
+              <option>Stable</option>
+            </select>
+            <span class="mod-select-label">Build:</span>
+            <select class="mod-select" id="mod-build">
+              <option>Latest</option>
+              <option>Recommended</option>
+            </select>
+            <label class="mod-checkbox">
+              <input type="checkbox" id="mod-nightly"/>
+              Nightly
+            </label>
+          </div>
+
+          <!-- Search -->
+          <div style="margin-bottom:8px;display:flex;gap:6px;">
+            <input type="text" id="mod-search-input" placeholder="Tìm mod trên Modrinth..." style="
+              flex:1;padding:7px 10px;background:var(--surface);border:1px solid var(--border);
+              border-radius:6px;font-size:11px;color:var(--text);font-family:'Inter',sans-serif;outline:none;
+            "/>
+            <button onclick="searchModsOnline()" style="
+              padding:7px 12px;background:rgba(79,195,247,.15);border:1px solid rgba(79,195,247,.3);
+              border-radius:6px;font-size:11px;color:var(--accent);cursor:pointer;font-weight:600;white-space:nowrap;
+            ">Tìm</button>
+          </div>
+
+          <!-- Search Results (hidden by default) -->
+          <div id="mod-search-results" style="display:none;">
+            <div class="mod-section-title">Kết quả tìm kiếm</div>
+            <div class="mod-list" id="search-results-list"></div>
+          </div>
+
+          <!-- Recommended Mods -->
+          <div class="mod-section-title">Recommended Mods</div>
+          <div class="mod-list" id="recommended-mods">
+            <div style="color:var(--muted);font-size:11px;padding:10px;text-align:center;">Đang tải...</div>
+          </div>
+
+          <!-- Additional Mods -->
+          <div class="mod-section-title">Additional Mods</div>
+          <div class="mod-list" id="additional-mods">
+            <div style="color:var(--muted);font-size:11px;padding:10px;text-align:center;">Đang tải...</div>
+          </div>
+
+          <!-- Install button + progress -->
+          <div class="install-bar">
+            <button class="install-btn" id="install-mods-btn" onclick="installSelectedMods()">
+              INSTALL
+            </button>
+          </div>
+          <div id="mod-progress">
+            <div id="mod-progress-text">Đang tải mod...</div>
+            <div id="mod-progress-track"><div id="mod-progress-fill"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="right">
+        <div>
+          <div class="section-lbl">Thống kê phiên</div>
+          <div class="stats-grid">
+            <div class="stat"><div class="stat-v" id="stat-fps">—</div><div class="stat-l">FPS</div></div>
+            <div class="stat"><div class="stat-v" id="stat-ping">—</div><div class="stat-l">Ping</div></div>
+            <div class="stat"><div class="stat-v" id="stat-ram">—</div><div class="stat-l">RAM</div></div>
+            <div class="stat"><div class="stat-v">✓</div><div class="stat-l">Mods OK</div></div>
+          </div>
+        </div>
+
+        <div>
+          <div class="section-lbl">Tin tức</div>
+          <div class="news-card"><div class="news-tag">Cập nhật</div><div class="news-ttl">Nova v1.0 — Ra mắt hỗ trợ Minecraft 1.21.4</div><div class="news-date">11/04/2026</div></div>
+          <div class="news-card"><div class="news-tag" style="color:var(--accent)">Mẹo</div><div class="news-ttl">Bật OptiFine để shader chạy mượt hơn</div><div class="news-date">10/04/2026</div></div>
+          <div class="news-card"><div class="news-tag" style="color:var(--green)">PvP</div><div class="news-ttl">Hypixel SkyWars Season mới đã bắt đầu!</div><div class="news-date">08/04/2026</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Launch bar -->
+    <div id="launch-bar">
+      <div id="progress-area">
+        <div id="progress-text">Đang khởi động...</div>
+        <div id="progress-track"><div id="progress-fill"></div></div>
+      </div>
+      <input id="server-input" type="text" placeholder="IP server tự động kết nối (tùy chọn)"/>
+      <select id="ram-select">
+        <option>1G</option>
+        <option>2G</option>
+        <option selected>4G</option>
+        <option>6G</option>
+        <option>8G</option>
+      </select>
+      <button id="launch-btn" onclick="launchOrStop()">
+        ▶ KHỞI ĐỘNG
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+/**
+ * @file index.html (inline script)
+ * @description Frontend logic for Nova Client UI. Manages user authentication,
+ *              version selection, game launching/stopping, progress display,
+ *              and console log toggling. Communicates with the main process
+ *              via the novaAPI bridge exposed by preload.js.
+ */
+
+/** @type {Object|null} Authenticated Minecraft player profile (name, uuid, accessToken) */
+let profile = null;
+
+/** @type {string} Currently selected Minecraft version to launch */
+let selectedVersion = '1.26.1';
+
+/** @type {boolean} Whether the Minecraft game process is currently running */
+let gameRunning = false;
+
+/** @type {Object} Tracks download progress by asset type */
+let downloadProgress = {};
+
+/**
+ * Handles offline/crack login. Takes username from input field,
+ * creates an offline profile via novaAPI, and enters the main UI.
+ */
+async function doOfflineLogin() {
+  const username = document.getElementById('offlineUsername').value.trim();
+  if (username.length < 3) {
+    alert('Tên phải có ít nhất 3 ký tự!');
+    return;
+  }
+  const btn = document.getElementById('offlineBtn');
+  btn.textContent = '⏳ Đang vào...';
+  btn.disabled = true;
+  const result = await novaAPI.offlineLogin(username);
+  if (result.success) {
+    profile = result.profile;
+    document.getElementById('login-overlay').classList.remove('show');
+    document.getElementById('userAvatar').textContent = profile.name[0].toUpperCase();
+    document.getElementById('userName').textContent = profile.name;
+    document.querySelector('.login-hint').textContent = 'Crack / Offline';
+    document.querySelector('.login-hint').className = 'u-status online';
+  } else {
+    btn.textContent = '⚡ Chơi Crack / Offline';
+    btn.disabled = false;
+    alert('Lỗi: ' + result.error);
+  }
+}
+
+/**
+ * Initiates Microsoft authentication via the novaAPI bridge.
+ * On success, hides the login overlay and updates the sidebar user profile.
+ * On failure, re-enables the login button and shows an error alert.
+ */
+async function doLogin() {
+  const btn = document.getElementById('loginBtn');
+  btn.textContent = '⏳ Đang xác thực...';
+  btn.disabled = true;
+  const result = await novaAPI.login();
+  if (result.success) {
+    profile = result.profile;
+    document.getElementById('login-overlay').classList.remove('show');
+    document.getElementById('userAvatar').textContent = profile.name[0].toUpperCase();
+    document.getElementById('userName').textContent = profile.name;
+    document.querySelector('.login-hint').textContent = 'Đã đăng nhập';
+    document.querySelector('.login-hint').className = 'u-status online';
+  } else {
+    btn.textContent = '🪟 Đăng nhập với Microsoft';
+    btn.disabled = false;
+    alert('Đăng nhập thất bại: ' + result.error);
+  }
+}
+
+/**
+ * Selects a Minecraft version from the version grid.
+ * Updates the UI highlight and the hero section version label.
+ * @param {HTMLElement} el - The clicked version card element (must have data-ver attribute)
+ */
+function selectVer(el) {
+  document.querySelectorAll('.ver-card').forEach(v => v.classList.remove('sel'));
+  el.classList.add('sel');
+  selectedVersion = el.dataset.ver;
+  document.getElementById('selectedVerLabel').textContent = selectedVersion;
+}
+
+/**
+ * Handles the main launch/stop button click.
+ * - If game is running: kills the game process.
+ * - If not logged in: shows the login overlay.
+ * - Otherwise: launches Minecraft with the selected version, RAM, and optional server.
+ * Updates UI state (button text, progress bar, stats) accordingly.
+ */
+async function launchOrStop() {
+  if (gameRunning) {
+    await novaAPI.killGame();
+    return;
+  }
+  if (!profile) {
+    document.getElementById('login-overlay').classList.add('show');
+    return;
+  }
+  const ram = document.getElementById('ram-select').value;
+  const server = document.getElementById('server-input').value.trim();
+  const btn = document.getElementById('launch-btn');
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Đang tải...';
+  document.getElementById('progress-area').classList.add('show');
+  document.getElementById('server-input').style.display = 'none';
+
+  const result = await novaAPI.launch({
+    version: selectedVersion,
+    profile,
+    ram,
+    server: server || null
+  });
+
+  if (!result.success) {
+    btn.disabled = false;
+    btn.textContent = '▶ KHỞI ĐỘNG';
+    document.getElementById('progress-area').classList.remove('show');
+    document.getElementById('server-input').style.display = '';
+    alert('Lỗi: ' + result.error);
+    return;
+  }
+
+  gameRunning = true;
+  btn.disabled = false;
+  btn.textContent = '⏹ DỪNG GAME';
+  btn.classList.add('running');
+  document.getElementById('stat-fps').textContent = '60+';
+  document.getElementById('stat-ram').textContent = ram;
+}
+
+// --- IPC event listeners from main process ---
+
+/**
+ * Handles download/launch progress updates.
+ * Updates the progress bar width and status text (assets, libraries, etc.).
+ */
+novaAPI.onProgress((data) => {
+  const pct = data.total > 0 ? Math.round((data.task / data.total) * 100) : 0;
+  document.getElementById('progress-fill').style.width = pct + '%';
+  document.getElementById('progress-text').textContent =
+    `${data.type === 'assets' ? 'Tải assets' : data.type === 'libraries' ? 'Tải thư viện' : 'Tải'}: ${data.task}/${data.total}`;
+});
+
+/** Appends game console log messages to the log area and auto-scrolls to bottom */
+novaAPI.onLog((msg) => {
+  const log = document.getElementById('log-area');
+  log.textContent += msg + '\n';
+  log.scrollTop = log.scrollHeight;
+});
+
+/** Resets UI to idle state when the Minecraft game process exits */
+novaAPI.onGameClosed((code) => {
+  gameRunning = false;
+  const btn = document.getElementById('launch-btn');
+  btn.textContent = '▶ KHỞI ĐỘNG';
+  btn.classList.remove('running');
+  document.getElementById('progress-area').classList.remove('show');
+  document.getElementById('server-input').style.display = '';
+  document.getElementById('progress-fill').style.width = '0';
+  document.getElementById('stat-fps').textContent = '—';
+  document.getElementById('stat-ram').textContent = '—';
+});
+
+/** Handles game errors by resetting state and showing an alert */
+novaAPI.onGameError((err) => {
+  gameRunning = false;
+  alert('Lỗi game: ' + err);
+});
+
+/** Toggles the visibility of the console log overlay panel */
+function toggleLogs() {
+  document.getElementById('log-area').classList.toggle('show');
+}
+
+/**
+ * Tải danh sách tất cả phiên bản Minecraft từ Mojang API
+ * và render vào version grid. Phiên bản đầu tiên được chọn mặc định.
+ */
+async function loadVersions() {
+  const grid = document.getElementById('version-grid');
+  const result = await novaAPI.getVersions();
+  if (!result.success || !result.versions.length) {
+    grid.innerHTML = '<div style="color:var(--muted);font-size:12px;grid-column:1/-1;text-align:center;">Không tải được danh sách phiên bản</div>';
+    return;
+  }
+  grid.innerHTML = '';
+  result.versions.forEach((v, i) => {
+    const card = document.createElement('div');
+    card.className = 'ver-card' + (i === 0 ? ' sel' : '');
+    card.dataset.ver = v.id;
+    card.onclick = function() { selectVer(this); };
+    const isLatest = i === 0;
+    card.innerHTML =
+      '<div class="ver-num">' + v.id + '</div>' +
+      '<div class="ver-type">' + v.type + '</div>' +
+      (isLatest ? '<div class="badge">Mới nhất</div>' : '<div class="badge">Ổn định</div>');
+    grid.appendChild(card);
+  });
+  selectedVersion = result.versions[0].id;
+  document.getElementById('selectedVerLabel').textContent = selectedVersion;
+}
+
+// Tải phiên bản khi app khởi động
+loadVersions();
+
+// ---- Mod Manager (Modrinth API) ----
+
+/** @type {Object|null} Config mod hiện tại */
+let modConfig = null;
+
+/** @type {string[]} Danh sách file .jar đã cài */
+let installedMods = [];
+
+/** Màu icon cho mod */
+const MOD_COLORS = ['#4fc3f7', '#f59e0b', '#7c4dff', '#28c840', '#e53935', '#ff9800'];
+
+/**
+ * Tải danh sách mod config + mod đã cài, render UI.
+ */
+async function loadModConfig() {
+  const [configResult, installedResult] = await Promise.all([
+    novaAPI.getModConfig(),
+    novaAPI.getInstalledMods()
+  ]);
+
+  if (configResult.success) {
+    modConfig = configResult.config;
+    if (modConfig.branches) {
+      const branchSel = document.getElementById('mod-branch');
+      branchSel.innerHTML = modConfig.branches.map(b => '<option>' + b + '</option>').join('');
+    }
+    if (modConfig.builds) {
+      const buildSel = document.getElementById('mod-build');
+      buildSel.innerHTML = modConfig.builds.map(b => '<option>' + b + '</option>').join('');
+    }
+  }
+
+  if (installedResult.success) {
+    installedMods = installedResult.mods;
+  }
+
+  renderMods();
+}
+
+/**
+ * Render danh sách mod vào UI.
+ */
+function renderMods() {
+  if (!modConfig) return;
+
+  const recContainer = document.getElementById('recommended-mods');
+  recContainer.innerHTML = '';
+  modConfig.recommended_mods.forEach((mod, i) => {
+    const isInstalled = installedMods.some(f => f.toLowerCase().includes(mod.slug.toLowerCase()));
+    const color = MOD_COLORS[i % MOD_COLORS.length];
+    recContainer.innerHTML += createModRow(mod, color, isInstalled);
+  });
+
+  const addContainer = document.getElementById('additional-mods');
+  addContainer.innerHTML = '';
+  modConfig.additional_mods.forEach((mod, i) => {
+    const isInstalled = installedMods.some(f => f.toLowerCase().includes(mod.slug.toLowerCase()));
+    const color = MOD_COLORS[(i + 3) % MOD_COLORS.length];
+    addContainer.innerHTML += createModRow(mod, color, isInstalled);
+  });
+}
+
+/**
+ * Tạo HTML cho 1 hàng mod.
+ */
+function createModRow(mod, color, isInstalled) {
+  const toggleClass = (mod.default_enabled || isInstalled) ? 'toggle on' : 'toggle';
+  const installedClass = isInstalled ? ' installed' : '';
+  const badge = isInstalled ? '<span class="mod-badge">Installed</span>' : '';
+  const sourceTag = mod.source === 'modrinth'
+    ? '<span style="font-size:8px;color:#1bd96a;font-weight:600;">MODRINTH</span>'
+    : '<span style="font-size:8px;color:var(--muted);font-weight:600;">GITHUB</span>';
+  return `
+    <div class="mod-row${installedClass}" data-slug="${mod.slug}" data-source="${mod.source}" data-github="${mod.github_repo || ''}">
+      <div class="mod-ico" style="background:${color}22">
+        <svg width="14" height="14" fill="${color}" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      </div>
+      <div class="mod-info">
+        <div class="mod-name">${mod.name} ${badge}</div>
+        <div class="mod-desc">${mod.description} ${sourceTag}</div>
+      </div>
+      <div class="${toggleClass}" onclick="this.classList.toggle('on')"></div>
+    </div>
+  `;
+}
+
+/**
+ * Tìm kiếm mod trên Modrinth API.
+ */
+async function searchModsOnline() {
+  const query = document.getElementById('mod-search-input').value.trim();
+  if (!query) return;
+
+  const resultsDiv = document.getElementById('mod-search-results');
+  const listDiv = document.getElementById('search-results-list');
+  resultsDiv.style.display = 'block';
+  listDiv.innerHTML = '<div style="color:var(--muted);font-size:11px;padding:10px;text-align:center;">Đang tìm...</div>';
+
+  const result = await novaAPI.searchMods({ query, gameVersion: selectedVersion });
+
+  if (!result.success || !result.mods.length) {
+    listDiv.innerHTML = '<div style="color:var(--muted);font-size:11px;padding:10px;text-align:center;">Không tìm thấy mod nào</div>';
+    return;
+  }
+
+  listDiv.innerHTML = '';
+  result.mods.forEach((mod, i) => {
+    const isInstalled = installedMods.some(f => f.toLowerCase().includes(mod.slug.toLowerCase()));
+    const color = MOD_COLORS[i % MOD_COLORS.length];
+    const downloads = mod.downloads > 1000000 ? (mod.downloads / 1000000).toFixed(1) + 'M' :
+                      mod.downloads > 1000 ? (mod.downloads / 1000).toFixed(0) + 'K' : mod.downloads;
+    const badge = isInstalled ? '<span class="mod-badge">Installed</span>' : '';
+    listDiv.innerHTML += `
+      <div class="mod-row${isInstalled ? ' installed' : ''}" data-slug="${mod.slug}" data-source="modrinth" data-github="">
+        <div class="mod-ico" style="background:${color}22">
+          <svg width="14" height="14" fill="${color}" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        </div>
+        <div class="mod-info">
+          <div class="mod-name">${mod.name} ${badge}</div>
+          <div class="mod-desc">${mod.description.substring(0, 60)}... <span style="font-size:8px;color:#1bd96a;">${downloads} DL</span></div>
+        </div>
+        <div class="toggle" onclick="this.classList.toggle('on')"></div>
+      </div>
+    `;
+  });
+}
+
+// Enter để search
+document.addEventListener('DOMContentLoaded', () => {
+  const searchInput = document.getElementById('mod-search-input');
+  if (searchInput) {
+    searchInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') searchModsOnline();
+    });
+  }
+});
+
+/**
+ * Bấm Install → resolve URL từ Modrinth API + tải .jar cho MC version đang chọn.
+ */
+async function installSelectedMods() {
+  const btn = document.getElementById('install-mods-btn');
+  const rows = document.querySelectorAll('.mod-row');
+  const modsToInstall = [];
+
+  rows.forEach(row => {
+    const toggle = row.querySelector('.toggle');
+    if (toggle && toggle.classList.contains('on')) {
+      const slug = row.dataset.slug;
+      const source = row.dataset.source;
+      const github = row.dataset.github;
+      const name = row.querySelector('.mod-name').textContent.trim().replace('Installed', '').trim();
+      if (slug) {
+        modsToInstall.push({
+          name,
+          slug,
+          source: source || 'modrinth',
+          github_repo: github || ''
+        });
+      }
+    }
+  });
+
+  if (modsToInstall.length === 0) {
+    alert('Chưa chọn mod nào để cài!');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Đang cài ' + modsToInstall.length + ' mod...';
+  document.getElementById('mod-progress').classList.add('show');
+
+  const result = await novaAPI.installMods({
+    mods: modsToInstall,
+    gameVersion: selectedVersion
+  });
+
+  if (result.installed.length > 0) {
+    btn.textContent = 'Đã cài ' + result.installed.length + ' mod ✓';
+    btn.classList.add('success');
+    const installedResult = await novaAPI.getInstalledMods();
+    if (installedResult.success) {
+      installedMods = installedResult.mods;
+      renderMods();
+    }
+  } else {
+    btn.textContent = 'Không cài được mod nào';
+  }
+
+  if (result.errors.length > 0) {
+    alert('Lỗi:\n' + result.errors.join('\n'));
+  }
+
+  setTimeout(() => {
+    btn.disabled = false;
+    btn.textContent = 'INSTALL';
+    btn.classList.remove('success');
+    document.getElementById('mod-progress').classList.remove('show');
+    document.getElementById('mod-progress-fill').style.width = '0%';
+  }, 4000);
+}
+
+/** Lắng nghe tiến trình cài mod */
+novaAPI.onModProgress((data) => {
+  if (data.status === 'complete') {
+    document.getElementById('mod-progress-fill').style.width = '100%';
+    document.getElementById('mod-progress-text').textContent =
+      `Hoàn tất! ${data.installed || 0} mod đã cài, ${data.errors || 0} lỗi`;
+    return;
+  }
+
+  if (data.percent) {
+    document.getElementById('mod-progress-fill').style.width = data.percent + '%';
+  } else {
+    const pct = data.total > 0 ? Math.round((data.current / data.total) * 100) : 0;
+    document.getElementById('mod-progress-fill').style.width = pct + '%';
+  }
+
+  const statusText = data.status === 'resolving' ? 'Tìm version...' :
+                     data.status === 'downloading' ? 'Đang tải' : 'Xong';
+  const fileInfo = data.filename ? ` (${data.filename})` : '';
+  document.getElementById('mod-progress-text').textContent =
+    `${statusText}: ${data.name}${fileInfo} [${data.current}/${data.total}]`;
+});
+
+// Tải mod config khi khởi động
+loadModConfig();
+
+// ---- Auto-Update System ----
+// Flow: Mở app → check GitHub → có bản mới → hiện banner → bấm update → tải zip → giải nén → restart
+
+/** @type {string|null} URL tải bản cập nhật */
+let updateDownloadUrl = null;
+
+/** @type {Object|null} Thông tin update */
+let updateInfo = null;
+
+/**
+ * Hiện version hiện tại trên UI.
+ */
+async function showCurrentVersion() {
+  try {
+    const result = await novaAPI.getVersion();
+    document.getElementById('app-version').textContent = result.version;
+  } catch (e) {}
+}
+
+/**
+ * Kiểm tra cập nhật từ GitHub releases.
+ * Tự chạy khi mở app. Nếu có bản mới → hiện banner.
+ */
+async function checkForUpdates() {
+  try {
+    const result = await novaAPI.checkUpdate();
+
+    if (result.hasUpdate && result.downloadUrl) {
+      updateInfo = result;
+      updateDownloadUrl = result.downloadUrl;
+
+      // Hiện banner
+      document.getElementById('update-title').textContent = 'Nova Client ' + result.latestVersion + ' đã có!';
+      document.getElementById('update-desc').textContent = 'Bản cập nhật mới sẵn sàng. Bấm để tự động cài đặt.';
+
+      document.getElementById('update-ver-old').textContent = 'v' + result.currentVersion;
+      document.getElementById('update-ver-new').textContent = 'v' + result.latestVersion;
+      document.getElementById('update-versions').style.display = 'flex';
+
+      if (result.releaseNotes) {
+        document.getElementById('update-notes').textContent = result.releaseNotes;
+        document.getElementById('update-notes').style.display = 'block';
+      }
+
+      document.getElementById('update-banner').classList.add('show');
+    }
+  } catch (e) {
+    // Im lặng nếu check thất bại
+  }
+}
+
+/**
+ * Bấm "CẬP NHẬT NGAY" → tải zip → giải nén → ghi đè file → restart app.
+ */
+async function doAutoUpdate() {
+  if (!updateDownloadUrl) {
+    await novaAPI.openReleasePage();
+    return;
+  }
+
+  const btn = document.getElementById('update-install-btn');
+  btn.disabled = true;
+  btn.textContent = 'ĐANG CẬP NHẬT...';
+
+  // Hiện progress, ẩn actions
+  document.getElementById('update-progress').style.display = 'block';
+  document.getElementById('update-actions').style.display = 'none';
+
+  const result = await novaAPI.downloadAndInstall(updateDownloadUrl);
+
+  if (!result.success) {
+    document.getElementById('update-progress-text').textContent = 'Lỗi: ' + result.error;
+    document.getElementById('update-actions').style.display = 'flex';
+    btn.disabled = false;
+    btn.textContent = 'THỬ LẠI';
+  }
+  // Nếu thành công → app sẽ tự restart, không cần xử lý gì thêm
+}
+
+/** Ẩn banner update */
+function dismissUpdate() {
+  document.getElementById('update-banner').classList.remove('show');
+}
+
+/** Lắng nghe tiến trình update từ main process */
+novaAPI.onUpdateProgress((data) => {
+  document.getElementById('update-progress').style.display = 'block';
+  document.getElementById('update-progress-fill').style.width = (data.percent || 0) + '%';
+  document.getElementById('update-progress-text').textContent = data.text || '';
+
+  if (data.step === 'done') {
+    document.getElementById('update-desc').textContent = 'Cập nhật xong! App sẽ khởi động lại...';
+    document.getElementById('update-progress-fill').style.width = '100%';
+    document.getElementById('update-progress-fill').style.background = 'linear-gradient(90deg,#28c840,#20a838)';
+  }
+
+  if (data.step === 'error') {
+    document.getElementById('update-progress-fill').style.background = 'linear-gradient(90deg,#e53935,#ff5252)';
+    document.getElementById('update-actions').style.display = 'flex';
+    const btn = document.getElementById('update-install-btn');
+    btn.disabled = false;
+    btn.textContent = 'THỬ LẠI';
+  }
+});
+
+// Khởi động: hiện version + tự check update sau 2 giây
+showCurrentVersion();
+setTimeout(checkForUpdates, 2000);
+</script>
+</body>
+</html>
