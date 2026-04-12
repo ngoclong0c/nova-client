@@ -1,6 +1,6 @@
 {
   "name": "nova-client",
-  "version": "0.1.0",
+  "version": "10.1.1",
   "description": "Nova Client - Minecraft Launcher",
   "main": "main.js",
   "scripts": {
