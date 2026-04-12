@@ -29,7 +29,31 @@ jobs:
             main.js \
             preload.js \
             index.html \
-            package.json
+            package.json \
+            fabric-mod/
+
+      - name: Update version.json
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          REPO="${{ github.repository }}"
+          DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          node -e "
+            const v = {
+              latest_version: '$VERSION',
+              download_url: 'https://github.com/$REPO/releases/download/v$VERSION/nova-client-$VERSION.zip',
+              release_notes: 'Nova Client v$VERSION',
+              release_date: '$DATE',
+              min_version: '0.1.0',
+              files: ['main.js', 'preload.js', 'index.html', 'package.json', 'fabric-mod/']
+            };
+            require('fs').writeFileSync('version.json', JSON.stringify(v, null, 2) + '\n');
+          "
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout main
+          git add version.json
+          git commit -m "chore: update version.json to v$VERSION" || true
+          git push origin main || true
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

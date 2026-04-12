@@ -1,0 +1,13 @@
+{
+  "latest_version": "0.1.0",
+  "versions": [
+    {
+      "version": "0.1.0",
+      "download_url": "https://github.com/ngoclong0c/nova-client/releases/download/v0.1.0/nova-client-0.1.0.zip",
+      "release_notes": "Nova Client v0.1.0 - Initial release",
+      "release_date": "2025-04-11T11:36:00+00:00",
+      "min_version": "0.1.0",
+      "files": ["main.js", "preload.js", "index.html", "package.json", "fabric-mod/"]
+    }
+  ]
+}

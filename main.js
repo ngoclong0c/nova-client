@@ -293,8 +293,9 @@ ipcMain.on('folder:open', () => {
 });
 
 // ---- Auto-Update System ----
-// Flow: Bạn tạo release trên GitHub (tag: v0.1.1, attach file nova-client-0.1.1.zip)
-//       → Người chơi mở launcher → check GitHub API → tải zip → giải nén đè file cũ → restart
+// Flow: Launcher khởi động → đọc version.json trên GitHub → so sánh version
+//       → có bản mới → tải zip → giải nén đè file cũ → restart
+// Không có mạng → bỏ qua, không báo lỗi
 
 const GITHUB_OWNER = 'ngoclong0c';
 const GITHUB_REPO = 'nova-client';
@@ -320,25 +321,57 @@ function compareVersions(a, b) {
 }
 
 /**
- * Check update từ GitHub releases.
- * @returns {Promise<Object>} hasUpdate, currentVersion, latestVersion, downloadUrl, releaseNotes, fileSize
+ * URL file version.json trên GitHub — launcher đọc file này để check update.
+ * File này được cập nhật bằng script Python: python server/version_server.py 0.2.0
+ */
+const VERSION_JSON_URL = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/main/version.json`;
+
+/**
+ * Check update: đọc version.json trên GitHub, fallback GitHub releases API.
+ * Không có mạng → trả hasUpdate: false, không báo lỗi.
  */
 ipcMain.handle('update:check', async () => {
   const fetch = require('node-fetch');
+
+  // --- Cách 1: Đọc version.json trên GitHub (nhanh, không bị rate limit) ---
+  try {
+    const res = await fetch(VERSION_JSON_URL, {
+      headers: { 'User-Agent': 'NovaClient/' + CURRENT_VERSION },
+      timeout: 5000
+    });
+    if (res.ok) {
+      const vData = await res.json();
+      const latestVersion = vData.latest_version;
+      if (compareVersions(latestVersion, CURRENT_VERSION) > 0) {
+        return {
+          hasUpdate: true,
+          currentVersion: CURRENT_VERSION,
+          latestVersion,
+          downloadUrl: vData.download_url,
+          releaseNotes: vData.release_notes || 'Phiên bản mới!',
+          releaseDate: vData.release_date,
+          files: vData.files,
+          source: 'version.json'
+        };
+      }
+      return { hasUpdate: false, currentVersion: CURRENT_VERSION, latestVersion, source: 'version.json' };
+    }
+  } catch (e) { /* fallback */ }
+
+  // --- Cách 2: Fallback GitHub releases API ---
   try {
     const res = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`, {
       headers: { 'User-Agent': 'NovaClient/' + CURRENT_VERSION }
     });
 
     if (res.status === 404) {
-      return { hasUpdate: false, currentVersion: CURRENT_VERSION, error: 'Chưa có release nào' };
+      return { hasUpdate: false, currentVersion: CURRENT_VERSION };
     }
 
     const data = await res.json();
     const latestVersion = data.tag_name.replace(/^v/, '');
 
     if (compareVersions(latestVersion, CURRENT_VERSION) > 0) {
-      // Tìm file .zip trong assets
       const zipAsset = data.assets.find(a => a.name.endsWith('.zip'));
       return {
         hasUpdate: true,
@@ -347,14 +380,16 @@ ipcMain.handle('update:check', async () => {
         downloadUrl: zipAsset ? zipAsset.browser_download_url : null,
         releaseNotes: data.body || 'Phiên bản mới!',
         fileSize: zipAsset ? zipAsset.size : 0,
-        fileName: zipAsset ? zipAsset.name : null
+        fileName: zipAsset ? zipAsset.name : null,
+        source: 'github-api'
       };
     }
 
-    return { hasUpdate: false, currentVersion: CURRENT_VERSION, latestVersion };
-  } catch (err) {
-    return { hasUpdate: false, currentVersion: CURRENT_VERSION, error: err.message };
-  }
+    return { hasUpdate: false, currentVersion: CURRENT_VERSION, latestVersion, source: 'github-api' };
+  } catch (e) { /* không có mạng → bỏ qua */ }
+
+  // Không có mạng → bỏ qua, không báo lỗi
+  return { hasUpdate: false, currentVersion: CURRENT_VERSION };
 });
 
 /**
@@ -491,7 +526,7 @@ ipcMain.handle('update:openReleasePage', async () => {
 // ---- Mod Manager (Modrinth API) ----
 
 const MODRINTH_API = 'https://api.modrinth.com/v2';
-const MODRINTH_HEADERS = { 'User-Agent': 'NovaClient/0.0.9 (github.com/ngoclong0c/nova-client)' };
+const MODRINTH_HEADERS = { 'User-Agent': `NovaClient/${CURRENT_VERSION} (github.com/${GITHUB_OWNER}/${GITHUB_REPO})` };
 
 /** Thư mục mods trong game dir */
 const MODS_DIR = path.join(GAME_DIR, 'mods');
