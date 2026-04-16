@@ -1,8 +1,8 @@
 'use strict';
 
 /**
- * IPC Router — registers all IPC handlers in one place.
- * Thin layer: validates input then delegates to services.
+ * IPC Router — registers all IPC handlers.
+ * Uses state store for profile/version state.
  */
 
 const { ipcMain, shell } = require('electron');
@@ -14,22 +14,33 @@ const modService = require('../services/modService');
 const updateService = require('../services/updateService');
 const settingsService = require('../services/settingsService');
 
-function register() {
+function register(store) {
   // ---- Auth ----
   ipcMain.handle('auth:login', async () => {
-    return authService.loginMicrosoft();
+    const result = await authService.loginMicrosoft();
+    if (result.success) store.set('profile', result.profile);
+    return result;
   });
 
   ipcMain.handle('auth:offline', async (event, username) => {
-    return authService.loginOffline(username);
+    const result = authService.loginOffline(username);
+    if (result.success) store.set('profile', result.profile);
+    return result;
   });
 
   // ---- Game ----
   ipcMain.handle('game:launch', async (event, opts) => {
-    return launchService.launch(opts);
+    store.set('gameRunning', true);
+    store.set('gameVersion', opts.version);
+    const result = await launchService.launch(opts);
+    if (!result.success) {
+      store.set('gameRunning', false);
+    }
+    return result;
   });
 
   ipcMain.handle('game:kill', async () => {
+    store.set('gameRunning', false);
     return launchService.kill();
   });
 
@@ -44,7 +55,27 @@ function register() {
   });
 
   ipcMain.handle('settings:save', async (event, data) => {
+    // Sync to store
+    if (data.profile) store.set('profile', data.profile);
+    if (data.selectedVersion) store.set('selectedVersion', data.selectedVersion);
+    if (data.ram) store.set('ram', data.ram);
+    if (data.server !== undefined) store.set('server', data.server);
     return { success: await settingsService.save(data) };
+  });
+
+  // ---- State ----
+  ipcMain.handle('store:get', async (event, key) => {
+    return store.get(key);
+  });
+
+  ipcMain.handle('store:getAll', async () => {
+    const state = store.getAll();
+    // Don't send accessToken to renderer
+    if (state.profile) {
+      state.profile = { ...state.profile };
+      delete state.profile.accessToken;
+    }
+    return state;
   });
 
   // ---- Update ----
@@ -53,7 +84,9 @@ function register() {
   });
 
   ipcMain.handle('update:check', async () => {
-    return updateService.check();
+    const result = await updateService.check();
+    if (result.hasUpdate) store.set('updateAvailable', result);
+    return result;
   });
 
   ipcMain.handle('update:downloadAndInstall', async (event, params) => {

@@ -8,12 +8,13 @@ const MAX_LOG_BACKUPS = 3;
 
 let logDir = null;
 let logFile = null;
+let crashFile = null;
 
 function init(gameDir) {
   logDir = path.join(gameDir, 'logs');
   fs.ensureDirSync(logDir);
   logFile = path.join(logDir, 'latest.log');
-  // Write startup marker
+  crashFile = path.join(logDir, 'crash.log');
   write('INFO', `Nova Client starting — PID ${process.pid}`);
 }
 
@@ -41,7 +42,40 @@ function write(level, message) {
     } catch (e) { /* ignore */ }
   }
   if (level === 'ERROR') console.error(line);
-  else console.log(line);
+  else if (level !== 'DEBUG') console.log(line);
+}
+
+/**
+ * Write crash report to separate crash.log with context.
+ * Appends full crash data, never rotated (user should check manually).
+ */
+function writeCrash(crashData) {
+  if (!crashFile) return;
+  const ts = new Date().toISOString();
+  const separator = '='.repeat(60);
+  const lines = [
+    separator,
+    `CRASH REPORT — ${ts}`,
+    separator,
+    typeof crashData === 'string' ? crashData : JSON.stringify(crashData, null, 2),
+    separator,
+    '',
+  ].join('\n');
+  try {
+    fs.appendFileSync(crashFile, lines);
+  } catch (e) { /* ignore */ }
+  write('ERROR', 'Crash report written to crash.log');
+}
+
+/**
+ * Get path to latest.log for attaching to error reports.
+ */
+function getLogPath() {
+  return logFile;
+}
+
+function getCrashLogPath() {
+  return crashFile;
 }
 
 module.exports = {
@@ -50,4 +84,7 @@ module.exports = {
   warn: (msg) => write('WARN', msg),
   error: (msg) => write('ERROR', msg),
   debug: (msg) => write('DEBUG', msg),
+  writeCrash,
+  getLogPath,
+  getCrashLogPath,
 };

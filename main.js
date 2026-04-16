@@ -15,6 +15,9 @@ const fs = require('fs-extra');
 const log = require('./src/main/utils/logger');
 const cryptoUtil = require('./src/main/utils/crypto');
 
+// ---- State Store ----
+const store = require('./src/main/store');
+
 // ---- Services ----
 const settingsService = require('./src/main/services/settingsService');
 const javaService = require('./src/main/services/javaService');
@@ -41,6 +44,10 @@ function initServices() {
   cryptoUtil.init(GAME_DIR);
   settingsService.init(GAME_DIR);
 
+  // Restore state from saved settings
+  const savedSettings = settingsService.load();
+  store.restore(savedSettings);
+
   // Helper to send events to renderer safely
   const send = (channel, data) => {
     mainWindow?.webContents.send(channel, data);
@@ -59,8 +66,15 @@ function initServices() {
     sendToRenderer: {
       progress: (data) => send('game:progress', data),
       log: (msg) => send('game:log', msg),
-      closed: (code) => send('game:closed', code),
+      closed: (code) => {
+        store.set('gameRunning', false);
+        send('game:closed', code);
+      },
       error: (msg) => send('game:error', msg),
+    },
+    onProfileRefreshed: (newProfile) => {
+      store.set('profile', newProfile);
+      settingsService.save(store.serialize());
     },
   });
 
@@ -83,6 +97,16 @@ function initServices() {
     appDir: path.dirname(require.main.filename),
     sendProgress: (data) => send('update:progress', data),
     restartApp: () => { app.relaunch(); app.exit(0); },
+  });
+
+  // Clean up old update backups on successful startup
+  updateService.cleanupOldBackups();
+
+  // Sync state changes to settings
+  store.on('change', (key) => {
+    if (['profile', 'selectedVersion', 'ram', 'server'].includes(key)) {
+      settingsService.save(store.serialize());
+    }
   });
 
   log.info(`Services initialized — v${CURRENT_VERSION}`);
@@ -134,7 +158,7 @@ function createWindow() {
   mainWindow.on('closed', () => { mainWindow = null; });
 }
 
-// ---- Window controls (simple IPC, stays in main.js) ----
+// ---- Window controls ----
 ipcMain.on('window:minimize', () => mainWindow?.minimize());
 ipcMain.on('window:maximize', () => {
   if (mainWindow?.isMaximized()) mainWindow.unmaximize();
@@ -146,7 +170,7 @@ ipcMain.on('folder:open', () => shell.openPath(GAME_DIR));
 // ---- App lifecycle ----
 app.whenReady().then(() => {
   initServices();
-  ipcRouter.register();
+  ipcRouter.register(store);
   createWindow();
   log.info('App ready');
 });

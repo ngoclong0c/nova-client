@@ -36,7 +36,6 @@ function getModsDir(gameVersion) {
   return dir;
 }
 
-/** Default mod config */
 const DEFAULT_MOD_CONFIG = {
   branches: ['Nextgen', 'Stable'],
   builds: ['Latest', 'Recommended'],
@@ -77,6 +76,8 @@ async function getModrinthVersion(slug, gameVersion, loader) {
     version: latest.version_number,
     size: primaryFile.size,
     sha512: primaryFile.hashes?.sha512 || null,
+    dependencies: latest.dependencies || [],
+    projectId: latest.project_id,
   };
 }
 
@@ -96,10 +97,11 @@ async function getGithubRelease(repo) {
     url: asset.browser_download_url,
     version: release.tag_name,
     size: asset.size,
+    dependencies: [],
   };
 }
 
-/** Resolve a single mod */
+/** Resolve a single mod with version fallback */
 async function resolve(slug, source, githubRepo, gameVersion) {
   let result = null;
   if (source === 'modrinth') {
@@ -114,7 +116,61 @@ async function resolve(slug, source, githubRepo, gameVersion) {
   return result;
 }
 
-/** Get mod config (online or fallback) */
+/**
+ * Resolve dependencies for a mod from Modrinth.
+ * Returns list of additional mods that need to be installed.
+ */
+async function resolveDependencies(modInfo, gameVersion, alreadyQueued) {
+  const deps = [];
+  if (!modInfo.dependencies || !modInfo.dependencies.length) return deps;
+
+  for (const dep of modInfo.dependencies) {
+    // Only auto-install required dependencies
+    if (dep.dependency_type !== 'required') continue;
+
+    const depId = dep.project_id;
+    if (!depId) continue;
+
+    // Skip if already in the install queue
+    if (alreadyQueued.has(depId)) continue;
+    alreadyQueued.add(depId);
+
+    try {
+      // Get project info to get slug
+      const projRes = await fetchWithRetry(`${MODRINTH_API}/project/${depId}`, {
+        headers: headers(),
+        timeout: 5000,
+      });
+      if (!projRes.ok) continue;
+      const project = await projRes.json();
+
+      // Resolve the dependency version
+      const depVersion = await getModrinthVersion(project.slug, gameVersion, 'fabric');
+      if (!depVersion) continue;
+
+      deps.push({
+        name: project.title,
+        slug: project.slug,
+        source: 'modrinth',
+        github_repo: '',
+        _resolved: depVersion,
+        _isDependency: true,
+      });
+      log.info(`Dependency resolved: ${project.title} (required by mod)`);
+
+      // Recurse: resolve sub-dependencies (max 1 level deep to avoid infinite loops)
+      if (depVersion.dependencies && depVersion.dependencies.length > 0) {
+        const subDeps = await resolveDependencies(depVersion, gameVersion, alreadyQueued);
+        deps.push(...subDeps);
+      }
+    } catch (e) {
+      log.warn(`Failed to resolve dependency ${depId}: ${e.message}`);
+    }
+  }
+
+  return deps;
+}
+
 async function getConfig() {
   try {
     const res = await fetchWithRetry(
@@ -129,7 +185,6 @@ async function getConfig() {
   return { success: true, config: JSON.parse(JSON.stringify(DEFAULT_MOD_CONFIG)), source: 'offline' };
 }
 
-/** Search mods on Modrinth */
 async function search(query, gameVersion) {
   try {
     const facets = JSON.stringify([['categories:fabric'], [`versions:${gameVersion}`], ['project_type:mod']]);
@@ -154,7 +209,6 @@ async function search(query, gameVersion) {
   }
 }
 
-/** Get installed mods for a specific game version */
 async function getInstalled(gameVersion) {
   try {
     const modsDir = getModsDir(gameVersion);
@@ -165,7 +219,6 @@ async function getInstalled(gameVersion) {
   }
 }
 
-/** Exact slug matching for filenames */
 function fileMatchesSlug(filename, slug) {
   const fLower = filename.toLowerCase();
   const sLower = slug.toLowerCase();
@@ -173,93 +226,146 @@ function fileMatchesSlug(filename, slug) {
 }
 
 /**
- * Install mods — PARALLEL download with Promise.allSettled.
- * Per-version mods directory.
+ * Download and install a single resolved mod.
+ */
+async function downloadAndVerifyMod(downloadInfo, modsDir, modSlug) {
+  const res = await fetchWithRetry(downloadInfo.url, {
+    headers: { 'User-Agent': 'NovaClient' },
+    redirect: 'follow',
+    timeout: 30000,
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+  // Remove old version
+  try {
+    const existingFiles = await fs.readdir(modsDir);
+    for (const f of existingFiles) {
+      if (f.endsWith('.jar') && fileMatchesSlug(f, modSlug)) {
+        await fs.remove(path.join(modsDir, f));
+      }
+    }
+  } catch (e) { /* ignore */ }
+
+  const buffer = await res.buffer();
+
+  // Verify SHA512
+  if (downloadInfo.sha512) {
+    const actualHash = crypto.createHash('sha512').update(buffer).digest('hex');
+    if (actualHash !== downloadInfo.sha512) {
+      throw new Error('Checksum SHA512 không khớp');
+    }
+  }
+
+  const savePath = path.join(modsDir, downloadInfo.filename);
+  await fs.writeFile(savePath, buffer);
+  return downloadInfo.filename;
+}
+
+/**
+ * Install mods with dependency resolution + parallel download.
  */
 async function installMods(modList, gameVersion) {
   const modsDir = getModsDir(gameVersion);
   log.info(`Mod install: ${modList.length} mods for MC ${gameVersion} → ${modsDir}`);
 
+  // Phase 1: Resolve all mods + their dependencies
+  sendProgress({ current: 0, total: modList.length, name: 'Resolving dependencies...', status: 'resolving' });
+
+  const resolvedMods = [];
+  const queuedProjectIds = new Set();
+  const installedSlugs = new Set();
+
+  // Check what's already installed
+  try {
+    const existing = await fs.readdir(modsDir);
+    for (const f of existing) {
+      if (f.endsWith('.jar')) {
+        // Extract slug-ish name from filename
+        const dashIdx = f.indexOf('-');
+        if (dashIdx > 0) installedSlugs.add(f.substring(0, dashIdx).toLowerCase());
+      }
+    }
+  } catch (e) { /* ignore */ }
+
+  for (const mod of modList) {
+    try {
+      const downloadInfo = await resolve(mod.slug, mod.source, mod.github_repo, gameVersion);
+      if (!downloadInfo) {
+        resolvedMods.push({ mod, error: `Không tìm thấy bản cho MC ${gameVersion}` });
+        continue;
+      }
+      resolvedMods.push({ mod, downloadInfo });
+
+      // Resolve dependencies (Modrinth mods only)
+      if (mod.source === 'modrinth' && downloadInfo.dependencies) {
+        if (downloadInfo.projectId) queuedProjectIds.add(downloadInfo.projectId);
+        // Add all explicitly queued mod slugs
+        modList.forEach(m => { if (m.slug) queuedProjectIds.add(m.slug); });
+
+        const deps = await resolveDependencies(downloadInfo, gameVersion, queuedProjectIds);
+        for (const dep of deps) {
+          // Skip if slug already installed
+          if (installedSlugs.has(dep.slug.toLowerCase())) {
+            log.info(`Dependency ${dep.slug} already installed, skipping`);
+            continue;
+          }
+          resolvedMods.push({ mod: dep, downloadInfo: dep._resolved });
+          log.info(`Auto-adding dependency: ${dep.name}`);
+        }
+      }
+    } catch (e) {
+      resolvedMods.push({ mod, error: e.message });
+    }
+  }
+
+  // Phase 2: Parallel download
+  const totalMods = resolvedMods.length;
+  log.info(`Installing ${totalMods} mods (including dependencies)`);
+
   const CONCURRENCY = 4;
   const installed = [];
   const errors = [];
 
-  // Process in batches of CONCURRENCY
-  for (let batchStart = 0; batchStart < modList.length; batchStart += CONCURRENCY) {
-    const batch = modList.slice(batchStart, batchStart + CONCURRENCY);
+  for (let batchStart = 0; batchStart < totalMods; batchStart += CONCURRENCY) {
+    const batch = resolvedMods.slice(batchStart, batchStart + CONCURRENCY);
 
-    const results = await Promise.allSettled(batch.map(async (mod, batchIdx) => {
+    const results = await Promise.allSettled(batch.map(async ({ mod, downloadInfo, error }, batchIdx) => {
       const i = batchStart + batchIdx;
-      sendProgress({ current: i + 1, total: modList.length, name: mod.name, status: 'resolving' });
 
-      // 1. Resolve
-      const downloadInfo = await resolve(mod.slug, mod.source, mod.github_repo, gameVersion);
-      if (!downloadInfo) throw new Error(`Không tìm thấy bản cho MC ${gameVersion}`);
+      if (error) throw new Error(error);
+      if (!downloadInfo) throw new Error('No download info');
 
-      sendProgress({ current: i + 1, total: modList.length, name: mod.name, status: 'downloading', filename: downloadInfo.filename, size: downloadInfo.size });
+      const label = mod._isDependency ? `[dep] ${mod.name}` : mod.name;
+      sendProgress({ current: i + 1, total: totalMods, name: label, status: 'downloading', filename: downloadInfo.filename });
 
-      // 2. Download
-      const res = await fetchWithRetry(downloadInfo.url, {
-        headers: { 'User-Agent': 'NovaClient' },
-        redirect: 'follow',
-        timeout: 30000,
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const filename = await downloadAndVerifyMod(downloadInfo, modsDir, mod.slug);
 
-      // 3. Remove old version of same mod
-      try {
-        const existingFiles = await fs.readdir(modsDir);
-        for (const f of existingFiles) {
-          if (f.endsWith('.jar') && fileMatchesSlug(f, mod.slug)) {
-            await fs.remove(path.join(modsDir, f));
-          }
-        }
-      } catch (e) { /* ignore */ }
-
-      // 4. Save file
-      const savePath = path.join(modsDir, downloadInfo.filename);
-      const buffer = await res.buffer();
-
-      // 5. Verify SHA512
-      if (downloadInfo.sha512) {
-        const actualHash = crypto.createHash('sha512').update(buffer).digest('hex');
-        if (actualHash !== downloadInfo.sha512) {
-          throw new Error('Checksum SHA512 không khớp — file có thể bị thay đổi');
-        }
-      }
-
-      await fs.writeFile(savePath, buffer);
-
-      sendProgress({ current: i + 1, total: modList.length, name: mod.name, status: 'done', filename: downloadInfo.filename });
-      log.info(`Mod installed: ${downloadInfo.filename}`);
-      return downloadInfo.filename;
+      sendProgress({ current: i + 1, total: totalMods, name: label, status: 'done', filename });
+      log.info(`Mod installed: ${filename}${mod._isDependency ? ' (dependency)' : ''}`);
+      return filename;
     }));
 
-    // Collect results
     results.forEach((result, batchIdx) => {
-      const mod = batch[batchIdx];
+      const { mod, error: resolveErr } = batch[batchIdx];
       if (result.status === 'fulfilled') {
         installed.push(result.value);
       } else {
-        const errMsg = `${mod.name}: ${result.reason?.message || 'Unknown error'}`;
+        const errMsg = `${mod.name}: ${resolveErr || result.reason?.message || 'Unknown error'}`;
         errors.push(errMsg);
         log.warn('Mod install failed: ' + errMsg);
       }
     });
   }
 
-  sendProgress({ current: modList.length, total: modList.length, name: '', status: 'complete', installed: installed.length, errors: errors.length });
+  sendProgress({ current: totalMods, total: totalMods, name: '', status: 'complete', installed: installed.length, errors: errors.length });
   return { success: true, installed, errors };
 }
 
-/** Remove a mod file */
 async function removeMod(filename, gameVersion) {
   try {
     const modsDir = getModsDir(gameVersion);
     const filePath = path.join(modsDir, filename);
-    if (await fs.pathExists(filePath)) {
-      await fs.remove(filePath);
-    }
+    if (await fs.pathExists(filePath)) await fs.remove(filePath);
     return { success: true };
   } catch (err) {
     return { success: false, error: err.message };
