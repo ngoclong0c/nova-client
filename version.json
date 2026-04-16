@@ -1,14 +1,15 @@
 {
-  "latest_version": "10.1.1",
-  "download_url": "https://github.com/ngoclong0c/nova-client/releases/download/v10.1.1/nova-client-10.1.1.zip",
-  "release_notes": "Nova Client v10.1.1",
-  "release_date": "2026-04-12T07:00:46.612885+00:00",
+  "latest_version": "11.0.0",
+  "download_url": "https://github.com/ngoclong0c/nova-client/releases/download/v11.0.0/nova-client-11.0.0.zip",
+  "release_notes": "Nova Client v11.0.0 — Full architecture refactor + pro upgrades",
+  "release_date": "2026-04-16T15:00:00.000000+00:00",
   "min_version": "0.1.0",
   "files": [
     "main.js",
     "preload.js",
     "index.html",
     "package.json",
+    "src/",
     "fabric-mod/"
   ]
 }

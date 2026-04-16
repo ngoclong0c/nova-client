@@ -32,6 +32,7 @@ jobs:
             preload.js \
             index.html \
             package.json \
+            src/ \
             fabric-mod/
 
       - name: Create GitHub Release

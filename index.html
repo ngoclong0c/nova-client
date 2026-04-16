@@ -613,6 +613,9 @@ function selectVer(el) {
   selectedVersion = el.dataset.ver;
   document.getElementById('selectedVerLabel').textContent = selectedVersion;
   saveSessionSettings();
+  // Reload mods + fabric for new version
+  loadModConfig();
+  checkFabricAvailability();
 }
 
 /**
@@ -808,7 +811,7 @@ const MOD_COLORS = ['#4fc3f7', '#f59e0b', '#7c4dff', '#28c840', '#e53935', '#ff9
 async function loadModConfig() {
   const [configResult, installedResult] = await Promise.all([
     novaAPI.getModConfig(),
-    novaAPI.getInstalledMods()
+    novaAPI.getInstalledMods(selectedVersion)
   ]);
 
   if (configResult.success) {
@@ -978,7 +981,7 @@ async function installSelectedMods() {
   if (result.installed.length > 0) {
     btn.textContent = 'Đã cài ' + result.installed.length + ' mod ✓';
     btn.classList.add('success');
-    const installedResult = await novaAPI.getInstalledMods();
+    const installedResult = await novaAPI.getInstalledMods(selectedVersion);
     if (installedResult.success) {
       installedMods = installedResult.mods;
       renderMods();

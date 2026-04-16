@@ -1,6 +1,39 @@
+# Dependencies
 node_modules/
+
+# Build output
 dist/
+out/
+*.exe
+*.dmg
+*.AppImage
+
+# Release artifacts
 *.zip
+
+# Dev/test files
+Untitled-*.js
+files.zip
+
+# Gradle (if any)
 .gradle/
 build/
-Untitled-*.js
+
+# Runtime data (generated at user's machine)
+logs/
+*.log
+settings.json
+.keyfile
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Electron
+*.asar

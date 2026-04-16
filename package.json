@@ -1,6 +1,6 @@
 {
   "name": "nova-client",
-  "version": "10.2.0",
+  "version": "11.0.0",
   "description": "Nova Client - Minecraft Launcher",
   "main": "main.js",
   "scripts": {
@@ -20,8 +20,13 @@
       "allowToChangeInstallationDirectory": true
     },
     "files": [
+      "main.js",
+      "preload.js",
+      "index.html",
+      "package.json",
       "src/**/*",
       "assets/**/*",
+      "fabric-mod/**/*",
       "node_modules/**/*"
     ]
   },

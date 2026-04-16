@@ -27,7 +27,7 @@ PACKAGE_FILE = os.path.join(ROOT_DIR, 'package.json')
 GITHUB_OWNER = 'ngoclong0c'
 GITHUB_REPO = 'nova-client'
 
-UPDATE_FILES = ['main.js', 'preload.js', 'index.html', 'package.json', 'fabric-mod/']
+UPDATE_FILES = ['main.js', 'preload.js', 'index.html', 'package.json', 'src/', 'fabric-mod/']
 
 
 def load_json(filepath):

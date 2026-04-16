@@ -120,12 +120,12 @@ contextBridge.exposeInMainWorld('novaAPI', {
   resolveMod: (params) => ipcRenderer.invoke('mods:resolve', params),
   /** Tìm kiếm mod trên Modrinth */
   searchMods: (params) => ipcRenderer.invoke('mods:search', params),
-  /** Lấy danh sách mod đã cài trong mods/ */
-  getInstalledMods: () => ipcRenderer.invoke('mods:getInstalled'),
-  /** Tải và cài đặt danh sách mod (resolve + download tự động) */
+  /** Lấy danh sách mod đã cài (per-version) */
+  getInstalledMods: (gameVersion) => ipcRenderer.invoke('mods:getInstalled', gameVersion),
+  /** Tải và cài đặt danh sách mod (resolve + download song song) */
   installMods: (params) => ipcRenderer.invoke('mods:install', params),
-  /** Xoá một mod */
-  removeMod: (filename) => ipcRenderer.invoke('mods:remove', filename),
+  /** Xoá một mod (per-version) */
+  removeMod: (filename, gameVersion) => ipcRenderer.invoke('mods:remove', { filename, gameVersion }),
   /** Lắng nghe tiến trình cài mod */
   onModProgress: (cb) => {
     ipcRenderer.removeAllListeners('mods:progress');

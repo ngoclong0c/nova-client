@@ -1,57 +1,102 @@
-# 🎮 Nova Client — Minecraft Launcher
+# Nova Client
 
-Launcher Minecraft Java Edition phong cách Lunar Client, chạy thật trên Windows.
+Modern Minecraft launcher built with Electron. Clean service-based architecture, per-version mod management, and automatic updates.
 
-## Yêu cầu
+## Features
 
-- **Node.js** v18+ → https://nodejs.org
-- **Java 17+** → https://adoptium.net (bắt buộc để chạy Minecraft)
-- **Tài khoản Minecraft Java Edition** (mua tại minecraft.net)
+- **Microsoft + Offline login** — Premium or crack, your choice
+- **Fabric auto-install** — One-click Fabric Loader setup per MC version
+- **Per-version mod management** — Mods separated by Minecraft version, no conflicts
+- **Modrinth integration** — Search and install mods directly from Modrinth
+- **Auto-update** — SHA256-verified updates from GitHub Releases
+- **Java auto-download** — Downloads Adoptium JRE 21 with checksum verification
+- **Crash detection** — Detects game crashes and shows error info
+- **Session persistence** — Remember your login, version, and settings
+- **Encrypted token storage** — AES-256-GCM with random key
 
-## Cài đặt & Chạy
+## Architecture
+
+```
+main.js                      <- Entry point (thin orchestrator)
+src/main/
+  ipc/                       <- IPC router
+  services/
+    authService              <- Microsoft OAuth + offline login
+    settingsService          <- Encrypted settings persistence
+    javaService              <- Java detection + auto-download
+    launchService            <- Game launch + crash handling
+    versionService           <- Minecraft version fetching
+    fabricService            <- Fabric Loader install
+    modService               <- Mod management (Modrinth/GitHub)
+    updateService            <- Auto-update system
+  utils/
+    logger                   <- Log rotation system
+    network                  <- Fetch with retry + backoff
+    crypto                   <- AES-256-GCM encryption
+    file                     <- Atomic file operations
+preload.js                   <- Secure IPC bridge
+index.html                   <- Renderer UI
+```
+
+## Tech Stack
+
+- **Electron 28** — Desktop framework
+- **minecraft-launcher-core** — Game launching
+- **msmc** — Microsoft authentication
+- **adm-zip** — ZIP extraction (pure JS, no system deps)
+- **node-fetch** — HTTP with streaming support
+- **fs-extra** — File system utilities
+
+## Installation
 
 ```bash
-# 1. Cài dependencies
+git clone https://github.com/ngoclong0c/nova-client.git
+cd nova-client
 npm install
-
-# 2. Chạy launcher (development)
 npm start
-
-# 3. Build file .exe cài đặt (production)
-npm run build
-# → File .exe xuất hiện trong thư mục dist/
 ```
 
-## Cách dùng
-
-1. Mở launcher → Nhấn **Đăng nhập với Microsoft**
-2. Cửa sổ Microsoft mở ra → Đăng nhập tài khoản Minecraft
-3. Chọn phiên bản Minecraft muốn chơi
-4. (Tùy chọn) Nhập IP server để tự động kết nối khi vào game
-5. Chọn lượng RAM cấp cho game
-6. Nhấn **KHỞI ĐỘNG** — launcher sẽ tự tải về assets/libraries lần đầu
-
-## Tính năng
-
-- ✅ Đăng nhập Microsoft (tài khoản thật)
-- ✅ Tải và chạy Minecraft Java từ 1.16.5 → 1.21.4
-- ✅ Tự động tải assets, libraries từ Mojang
-- ✅ Chọn RAM (1G → 8G)
-- ✅ Tự động kết nối server sau khi vào game
-- ✅ Console log theo dõi quá trình tải
-- ✅ Toggle mods UI (OptiFine, Keystrokes, MiniMap...)
-- ✅ Mở thư mục game (.nova-client trong AppData)
-
-## Lưu ý
-
-- Lần đầu chạy mỗi phiên bản sẽ tải ~300MB–500MB từ Mojang
-- Game lưu tại: `%APPDATA%\.nova-client\`
-- Để cài Fabric/Forge mod thật: copy vào thư mục `mods/` trong game dir
-- Java phải được cài và có trong PATH (gõ `java -version` để kiểm tra)
-
-## Build .exe
+## Development
 
 ```bash
-npm run build
+npm run dev     # Start with DevTools
+npm start       # Start normally
 ```
-File installer sẽ xuất hiện tại `dist/Nova Client Setup.exe`
+
+## Build
+
+```bash
+npm run build   # Build Windows installer (.exe)
+```
+
+Output: `dist/Nova Client Setup.exe`
+
+## Release
+
+```bash
+python server/version_server.py 1.0.0 --notes "Release notes here"
+# Automatically: bumps version, commits, tags, pushes, triggers GitHub Actions
+```
+
+## Security
+
+| Layer | Protection |
+|-------|-----------|
+| Renderer | No Node.js access, CSP headers |
+| Preload | contextBridge only, no direct IPC |
+| Tokens | AES-256-GCM, random keyfile per machine |
+| Updates | SHA256 checksum verification |
+| Mods | SHA512 hash verification (Modrinth) |
+| Network | Retry with backoff, timeouts on all requests |
+| Java | Adoptium checksum verification |
+
+## Notes
+
+- First launch per version downloads ~300-500MB from Mojang
+- Game data stored at: `%APPDATA%\.nova-client\`
+- Mods stored per-version: `%APPDATA%\.nova-client\mods\1.21.4\`
+- Logs at: `%APPDATA%\.nova-client\logs\latest.log`
+
+## License
+
+MIT
