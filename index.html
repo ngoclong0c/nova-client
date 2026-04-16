@@ -408,6 +408,19 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
           </div>
         </div>
 
+        <!-- Fabric Loader -->
+        <div>
+          <div class="section-lbl">Fabric Loader</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+            <span id="fabric-status" style="font-size:11px;color:var(--muted);">Kiểm tra Fabric...</span>
+            <button id="fabric-install-btn" onclick="installFabricLoader()" style="
+              padding:6px 14px;background:rgba(79,195,247,.15);border:1px solid rgba(79,195,247,.3);
+              border-radius:6px;font-size:11px;color:var(--accent);cursor:pointer;font-weight:600;
+              display:none;
+            ">Cài Fabric Loader</button>
+          </div>
+        </div>
+
         <!-- Mod Manager -->
         <div>
           <div class="section-lbl">Mod Manager</div>
@@ -556,6 +569,7 @@ async function doOfflineLogin() {
     document.getElementById('userName').textContent = profile.name;
     document.querySelector('.login-hint').textContent = 'Crack / Offline';
     document.querySelector('.login-hint').className = 'u-status online';
+    saveSessionSettings();
   } else {
     btn.textContent = '⚡ Chơi Crack / Offline';
     btn.disabled = false;
@@ -580,6 +594,7 @@ async function doLogin() {
     document.getElementById('userName').textContent = profile.name;
     document.querySelector('.login-hint').textContent = 'Đã đăng nhập';
     document.querySelector('.login-hint').className = 'u-status online';
+    saveSessionSettings();
   } else {
     btn.textContent = '🪟 Đăng nhập với Microsoft';
     btn.disabled = false;
@@ -597,6 +612,7 @@ function selectVer(el) {
   el.classList.add('sel');
   selectedVersion = el.dataset.ver;
   document.getElementById('selectedVerLabel').textContent = selectedVersion;
+  saveSessionSettings();
 }
 
 /**
@@ -644,7 +660,7 @@ async function launchOrStop() {
   btn.disabled = false;
   btn.textContent = '⏹ DỪNG GAME';
   btn.classList.add('running');
-  document.getElementById('stat-fps').textContent = '60+';
+  document.getElementById('stat-fps').textContent = 'N/A';
   document.getElementById('stat-ram').textContent = ram;
 }
 
@@ -704,9 +720,13 @@ async function loadVersions() {
     return;
   }
   grid.innerHTML = '';
+  const savedVersion = selectedVersion; // May have been restored from settings
+  const hasSaved = result.versions.some(v => v.id === savedVersion);
+  if (!hasSaved) selectedVersion = result.versions[0].id;
+
   result.versions.forEach((v, i) => {
     const card = document.createElement('div');
-    card.className = 'ver-card' + (i === 0 ? ' sel' : '');
+    card.className = 'ver-card' + (v.id === selectedVersion ? ' sel' : '');
     card.dataset.ver = v.id;
     card.onclick = function() { selectVer(this); };
     const isLatest = i === 0;
@@ -716,11 +736,59 @@ async function loadVersions() {
       (isLatest ? '<div class="badge">Mới nhất</div>' : '<div class="badge">Ổn định</div>');
     grid.appendChild(card);
   });
-  selectedVersion = result.versions[0].id;
   document.getElementById('selectedVerLabel').textContent = selectedVersion;
 }
 
+/** Save current session settings */
+async function saveSessionSettings() {
+  await novaAPI.saveSettings({
+    profile: profile,
+    selectedVersion: selectedVersion,
+    ram: document.getElementById('ram-select').value,
+    server: document.getElementById('server-input').value
+  });
+}
+
+/** Load saved session on startup */
+async function loadSavedSession() {
+  try {
+    const result = await novaAPI.loadSettings();
+    if (!result.success || !result.settings) return;
+    const s = result.settings;
+
+    // Restore profile
+    if (s.profile && s.profile.name) {
+      profile = s.profile;
+      document.getElementById('login-overlay').classList.remove('show');
+      document.getElementById('userAvatar').textContent = profile.name[0].toUpperCase();
+      document.getElementById('userName').textContent = profile.name;
+      const statusText = profile.userType === 'msa' ? 'Đã đăng nhập' : 'Crack / Offline';
+      document.querySelector('.login-hint').textContent = statusText;
+      document.querySelector('.login-hint').className = 'u-status online';
+    }
+
+    // Restore RAM
+    if (s.ram) {
+      const ramSelect = document.getElementById('ram-select');
+      for (const opt of ramSelect.options) {
+        if (opt.value === s.ram) { ramSelect.value = s.ram; break; }
+      }
+    }
+
+    // Restore server
+    if (s.server) {
+      document.getElementById('server-input').value = s.server;
+    }
+
+    // Restore selected version (applied after versions load)
+    if (s.selectedVersion) {
+      selectedVersion = s.selectedVersion;
+    }
+  } catch (e) { /* ignore */ }
+}
+
 // Tải phiên bản khi app khởi động
+loadSavedSession();
 loadVersions();
 
 // ---- Mod Manager (Modrinth API) ----
@@ -765,13 +833,20 @@ async function loadModConfig() {
 /**
  * Render danh sách mod vào UI.
  */
+/** Check if a mod jar filename matches a slug (exact, avoids "sodium" matching "sodium-extra") */
+function modFileMatchesSlug(filename, slug) {
+  const fLower = filename.toLowerCase();
+  const sLower = slug.toLowerCase();
+  return fLower.startsWith(sLower + '-') || fLower === sLower + '.jar';
+}
+
 function renderMods() {
   if (!modConfig) return;
 
   const recContainer = document.getElementById('recommended-mods');
   recContainer.innerHTML = '';
   modConfig.recommended_mods.forEach((mod, i) => {
-    const isInstalled = installedMods.some(f => f.toLowerCase().includes(mod.slug.toLowerCase()));
+    const isInstalled = installedMods.some(f => modFileMatchesSlug(f, mod.slug));
     const color = MOD_COLORS[i % MOD_COLORS.length];
     recContainer.innerHTML += createModRow(mod, color, isInstalled);
   });
@@ -779,7 +854,7 @@ function renderMods() {
   const addContainer = document.getElementById('additional-mods');
   addContainer.innerHTML = '';
   modConfig.additional_mods.forEach((mod, i) => {
-    const isInstalled = installedMods.some(f => f.toLowerCase().includes(mod.slug.toLowerCase()));
+    const isInstalled = installedMods.some(f => modFileMatchesSlug(f, mod.slug));
     const color = MOD_COLORS[(i + 3) % MOD_COLORS.length];
     addContainer.innerHTML += createModRow(mod, color, isInstalled);
   });
@@ -830,7 +905,7 @@ async function searchModsOnline() {
 
   listDiv.innerHTML = '';
   result.mods.forEach((mod, i) => {
-    const isInstalled = installedMods.some(f => f.toLowerCase().includes(mod.slug.toLowerCase()));
+    const isInstalled = installedMods.some(f => modFileMatchesSlug(f, mod.slug));
     const color = MOD_COLORS[i % MOD_COLORS.length];
     const downloads = mod.downloads > 1000000 ? (mod.downloads / 1000000).toFixed(1) + 'M' :
                       mod.downloads > 1000 ? (mod.downloads / 1000).toFixed(0) + 'K' : mod.downloads;
@@ -951,6 +1026,52 @@ novaAPI.onModProgress((data) => {
 // Tải mod config khi khởi động
 loadModConfig();
 
+// ---- Fabric Loader ----
+
+async function checkFabricAvailability() {
+  const statusEl = document.getElementById('fabric-status');
+  const btnEl = document.getElementById('fabric-install-btn');
+  try {
+    const result = await novaAPI.checkFabric(selectedVersion);
+    if (result.available) {
+      statusEl.textContent = `Fabric Loader ${result.loaderVersion} có sẵn cho MC ${selectedVersion}`;
+      btnEl.style.display = '';
+    } else {
+      statusEl.textContent = `Fabric chưa hỗ trợ MC ${selectedVersion}`;
+      btnEl.style.display = 'none';
+    }
+  } catch (e) {
+    statusEl.textContent = 'Không kiểm tra được Fabric';
+    btnEl.style.display = 'none';
+  }
+}
+
+async function installFabricLoader() {
+  const btn = document.getElementById('fabric-install-btn');
+  const statusEl = document.getElementById('fabric-status');
+  btn.disabled = true;
+  btn.textContent = 'Đang cài...';
+
+  const result = await novaAPI.installFabric(selectedVersion);
+  if (result.success) {
+    statusEl.textContent = `Fabric Loader đã cài! Version: ${result.versionId}`;
+    statusEl.style.color = 'var(--green)';
+    btn.textContent = 'Đã cài ✓';
+  } else {
+    statusEl.textContent = 'Lỗi: ' + result.error;
+    statusEl.style.color = '#e53935';
+    btn.textContent = 'Thử lại';
+    btn.disabled = false;
+  }
+}
+
+novaAPI.onFabricProgress((data) => {
+  document.getElementById('fabric-status').textContent = data.text || '';
+});
+
+// Check fabric khi khởi động
+setTimeout(checkFabricAvailability, 1000);
+
 // ---- Auto-Update System ----
 // Flow: Mở app → check GitHub → có bản mới → hiện banner → bấm update → tải zip → giải nén → restart
 
@@ -1019,7 +1140,10 @@ async function doAutoUpdate() {
   document.getElementById('update-progress').style.display = 'block';
   document.getElementById('update-actions').style.display = 'none';
 
-  const result = await novaAPI.downloadAndInstall(updateDownloadUrl);
+  const result = await novaAPI.downloadAndInstall({
+    downloadUrl: updateDownloadUrl,
+    expectedSha256: updateInfo?.sha256 || null
+  });
 
   if (!result.success) {
     document.getElementById('update-progress-text').textContent = 'Lỗi: ' + result.error;

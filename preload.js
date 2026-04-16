@@ -60,22 +60,22 @@ contextBridge.exposeInMainWorld('novaAPI', {
    * Registers a callback for download/launch progress events.
    * @param {Function} cb - Callback receiving {type, task, total}
    */
-  onProgress: (cb) => ipcRenderer.on('game:progress', (_, data) => cb(data)),
-  /**
-   * Registers a callback for game console log messages.
-   * @param {Function} cb - Callback receiving the log message string
-   */
-  onLog: (cb) => ipcRenderer.on('game:log', (_, msg) => cb(msg)),
-  /**
-   * Registers a callback for when the game process exits.
-   * @param {Function} cb - Callback receiving the exit code
-   */
-  onGameClosed: (cb) => ipcRenderer.on('game:closed', (_, code) => cb(code)),
-  /**
-   * Registers a callback for game error events.
-   * @param {Function} cb - Callback receiving the error message string
-   */
-  onGameError: (cb) => ipcRenderer.on('game:error', (_, err) => cb(err)),
+  onProgress: (cb) => {
+    ipcRenderer.removeAllListeners('game:progress');
+    ipcRenderer.on('game:progress', (_, data) => cb(data));
+  },
+  onLog: (cb) => {
+    ipcRenderer.removeAllListeners('game:log');
+    ipcRenderer.on('game:log', (_, msg) => cb(msg));
+  },
+  onGameClosed: (cb) => {
+    ipcRenderer.removeAllListeners('game:closed');
+    ipcRenderer.on('game:closed', (_, code) => cb(code));
+  },
+  onGameError: (cb) => {
+    ipcRenderer.removeAllListeners('game:error');
+    ipcRenderer.on('game:error', (_, err) => cb(err));
+  },
 
   /**
    * Fetches available Minecraft release versions.
@@ -86,17 +86,32 @@ contextBridge.exposeInMainWorld('novaAPI', {
   /** Opens the game data directory (%APPDATA%/.nova-client) in file explorer */
   openFolder: () => ipcRenderer.send('folder:open'),
 
+  // ---- Settings persistence ----
+  loadSettings: () => ipcRenderer.invoke('settings:load'),
+  saveSettings: (data) => ipcRenderer.invoke('settings:save', data),
+
   // ---- Auto-Update ----
   /** Lấy version hiện tại */
   getVersion: () => ipcRenderer.invoke('update:getVersion'),
   /** Kiểm tra bản cập nhật từ GitHub */
   checkUpdate: () => ipcRenderer.invoke('update:check'),
-  /** Tải + giải nén + cài đặt + restart app */
-  downloadAndInstall: (url) => ipcRenderer.invoke('update:downloadAndInstall', url),
+  /** Tải + giải nén + cài đặt + restart app. Accepts {downloadUrl, expectedSha256} */
+  downloadAndInstall: (params) => ipcRenderer.invoke('update:downloadAndInstall', params),
   /** Mở trang GitHub releases */
   openReleasePage: () => ipcRenderer.invoke('update:openReleasePage'),
   /** Lắng nghe tiến trình update */
-  onUpdateProgress: (cb) => ipcRenderer.on('update:progress', (_, data) => cb(data)),
+  onUpdateProgress: (cb) => {
+    ipcRenderer.removeAllListeners('update:progress');
+    ipcRenderer.on('update:progress', (_, data) => cb(data));
+  },
+
+  // ---- Fabric Loader ----
+  installFabric: (gameVersion) => ipcRenderer.invoke('fabric:install', gameVersion),
+  checkFabric: (gameVersion) => ipcRenderer.invoke('fabric:check', gameVersion),
+  onFabricProgress: (cb) => {
+    ipcRenderer.removeAllListeners('fabric:progress');
+    ipcRenderer.on('fabric:progress', (_, data) => cb(data));
+  },
 
   // ---- Mod Manager (Modrinth API) ----
   /** Lấy danh sách mod config (online + fallback) */
@@ -112,5 +127,8 @@ contextBridge.exposeInMainWorld('novaAPI', {
   /** Xoá một mod */
   removeMod: (filename) => ipcRenderer.invoke('mods:remove', filename),
   /** Lắng nghe tiến trình cài mod */
-  onModProgress: (cb) => ipcRenderer.on('mods:progress', (_, data) => cb(data)),
+  onModProgress: (cb) => {
+    ipcRenderer.removeAllListeners('mods:progress');
+    ipcRenderer.on('mods:progress', (_, data) => cb(data));
+  },
 });

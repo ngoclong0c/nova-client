@@ -14,6 +14,7 @@ Cách dùng:
 import os
 import sys
 import json
+import hashlib
 import subprocess
 from datetime import datetime, timezone
 
@@ -83,7 +84,16 @@ def list_versions():
         print()
 
 
-def update_version(version, release_notes=None):
+def compute_sha256(filepath):
+    """Compute SHA256 hash of a file."""
+    h = hashlib.sha256()
+    with open(filepath, 'rb') as f:
+        for chunk in iter(lambda: f.read(8192), b''):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def update_version(version, release_notes=None, zip_path=None):
     """Cập nhật version mới → ghi file → push lên GitHub."""
 
     current = get_current_version()
@@ -92,6 +102,18 @@ def update_version(version, release_notes=None):
 
     if not release_notes:
         release_notes = f'Nova Client v{version}'
+
+    # Compute SHA256 if zip file is provided or found
+    sha256 = None
+    if zip_path and os.path.exists(zip_path):
+        sha256 = compute_sha256(zip_path)
+        print(f'  SHA256: {sha256}')
+    else:
+        # Try to find zip in common locations
+        default_zip = os.path.join(ROOT_DIR, f'nova-client-{version}.zip')
+        if os.path.exists(default_zip):
+            sha256 = compute_sha256(default_zip)
+            print(f'  SHA256: {sha256}')
 
     print(f'\n  Cap nhat phien ban: {current} -> {version}')
     print(f'  Release notes: {release_notes}')
@@ -107,6 +129,7 @@ def update_version(version, release_notes=None):
     version_data = {
         'latest_version': version,
         'download_url': download_url,
+        'sha256': sha256,
         'release_notes': release_notes,
         'release_date': now,
         'min_version': '0.1.0',
@@ -123,6 +146,7 @@ def update_version(version, release_notes=None):
     new_entry = {
         'version': version,
         'download_url': download_url,
+        'sha256': sha256,
         'release_notes': release_notes,
         'release_date': now,
         'min_version': '0.1.0',
@@ -195,7 +219,14 @@ def main():
         if idx + 1 < len(args):
             release_notes = args[idx + 1]
 
-    update_version(version, release_notes)
+    # Parse --zip (path to zip file for SHA256 computation)
+    zip_path = None
+    if '--zip' in args:
+        idx = args.index('--zip')
+        if idx + 1 < len(args):
+            zip_path = args[idx + 1]
+
+    update_version(version, release_notes, zip_path)
 
 
 if __name__ == '__main__':
